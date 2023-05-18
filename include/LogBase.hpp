@@ -9,10 +9,16 @@
 #define LOG_BASE_HPP
 
 // System Libraries
+#include <cstdio>
+#include <deque>
 #include <string>
-#include <queue>
 
 namespace logging {
+	/// Static template for message timestamps.
+	const static char time_template[] = "9999-12-31 29:59:59.9999";
+	/// Static width of message timestamps.
+	const static unsigned int time_template_width = sizeof(time_template);
+
 	/**
 	 * 	@brief	Enum severity defines the severity levels of messages.
 	 */
@@ -51,7 +57,7 @@ namespace logging {
 			}
 		}
 
-		static unsigned int get_max_severity_length() {
+		const static unsigned int get_max_severity_length() {
 			// Just return 8 (length of "WARNING").
 			// I know this could be done more flexibly but this is fast.
 			return 8;
@@ -65,13 +71,13 @@ namespace logging {
 	 * 	@brief 	Function split_string takes in a string and splits it based on a delimiting character.
 	 * 	@param 	s			string to split.
 	 * 	@param 	delimiter 	string delimiter to split s based on.
-	 * 	@return queue of strings that contain the tokens of the original string.
-	 *	@note	If the original string does not contain the delimiter, a queue of one element containing 
+	 * 	@return deque of strings that contain the tokens of the original string.
+	 *	@note	If the original string does not contain the delimiter, a deque of one element containing 
 	 * 			the original string is returned.
 	 */
-	const std::queue<std::string> split_string(const std::string s, const std::string delimiter) {
-		// Queue of tokens found in the string.
-		std::queue<std::string> tokens;
+	const std::deque<std::string> split_string(const std::string s, const std::string delimiter) {
+		// Deque of tokens found in the string.
+		std::deque<std::string> tokens;
 		// Indices of tokens within the string.
 		unsigned long long position_start = 0;
 		unsigned long long position_end;
@@ -84,17 +90,56 @@ namespace logging {
 		while ((position_end = s.find(delimiter, position_start)) != std::string::npos) {
 			// Create a substring and store it as a token.
 			token = s.substr(position_start, position_end - position_start);
-			tokens.push(token);
+			tokens.push_back(token);
 
 			// Update the starting position in the search for tokens.
 			position_start = position_end + delimiter_length;
 		}
 
 		// Push the last substring to the list of tokens.
-		tokens.push(s.substr(position_start));
+		tokens.push_back(s.substr(position_start));
 
 		// Return the tokens.
 		return tokens;
+	}
+
+	/**
+	 * 	@brief	Function generate_timestamp generates a string timestamp for messages based on the current time.
+	 * 	@return const std::string formatted timestamp string.
+	 */
+	const static std::string generate_timestamp() 
+	{
+		// Get the current number of milliseconds.
+		auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() % 1000;
+
+		// Get the current time based on the platform.
+		auto t = std::time(0);
+		std::tm now {};
+		#if defined(__unix__)
+			localtime_r(&t, &now);
+		#elif defined(_MSC_VER)
+			localtime_s(&now, &t);
+		#else
+			static std::mutex mtx;
+			std::lock_guard<std::mutex> lock(mtx);
+			now = *std::localtime(&t);
+		#endif			
+
+		// Format the time into a buffer.
+		char timestamp_buffer[time_template_width];
+		std::snprintf(timestamp_buffer, 
+				time_template_width,
+				"%04d-%02d-%02d %02d:%02d:%02d.%lld",
+				now.tm_year + 1900,
+				now.tm_mon + 1,
+				now.tm_mday,
+				now.tm_hour,
+				now.tm_min,
+				now.tm_sec,
+				millis);
+
+		// Convert the buffer to a string.
+		return std::string(timestamp_buffer);
 	}
 }
 

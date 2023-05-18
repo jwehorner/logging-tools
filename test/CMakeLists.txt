@@ -1,5 +1,5 @@
 ##########################################
-# Google Test Installation
+# Catch 2 Test Installation
 ##########################################
 Include(FetchContent)
 
@@ -26,10 +26,7 @@ add_executable(test_logging_tools			"${CMAKE_SOURCE_DIR}/test/test_logging_tools
 
 include_directories(test_logging_tools		"${INCLUDES_LIST}")
 
-target_link_libraries(test_logging_tools 		Catch2::Catch2WithMain)
-
-if(WIN32)
-endif()
+target_link_libraries(test_logging_tools 	Catch2::Catch2WithMain)
 
 ##########################################
 # Regular Test Targets

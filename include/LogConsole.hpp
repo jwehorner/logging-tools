@@ -18,12 +18,13 @@
 #define NOMINMAX
 #endif
 #include <algorithm>
+#include <chrono>
+#include <deque>
 #include <iostream>
 #include <iomanip>
 #include <mutex>
 #include <string>
 #include <sstream>
-#include <queue>
 
 // Platform Dependant System Libraries
 #ifdef _WIN32
@@ -75,34 +76,47 @@ namespace logging {
 			std::scoped_lock<std::mutex> print_guard(mutex_print);
 			max_name_width = std::max(max_name_width, (unsigned int)name.length());
 
+			// Generate the timestamp for the message.
+			std::string timestamp = generate_timestamp();
+
 			// Split the message into a queue of lines.
-			std::queue<std::string> message_lines = logging::split_string(message, "\n");
+			std::deque<std::string> message_lines = logging::split_string(message, "\n");
 
 			// Create a string stream to write the formatted output string to.
 			std::stringstream ss;
 
 			// Print the first line of the output in the format:
-			// [SEVERITY] (NAME) 					MESSAGE LINE 1
-			ss << std::left << "[" << std::setw(max_severity_width + 2) << std::string(Severity(severity)) + "]" << "(" << std::setw(max_name_width + 2) << std::string(name) + ")" << std::right;
+			// [TIME] [SEVERITY] (NAME) 					MESSAGE LINE 1
+			ss 	<< std::left 
+				<< "[" << std::setw(time_template_width) << timestamp + "]" 
+				<< "[" << std::setw(Severity::get_max_severity_length() + 2) << std::string(Severity(severity)) + "]" 
+				<< "(" << std::setw(max_name_width + 2) << std::string(name) + ")" 
+				<< std::right;
+
+			// Find the maximum width of each of the message lines
+			size_t max_message_width = 0;
+			for (std::string s : message_lines) {
+				max_message_width = std::max(max_message_width, s.length());
+			}
 
 			// Get the first line of the message (there is guaranteed to be 1).
 			std::string line = message_lines.front();
-			message_lines.pop();
+			message_lines.pop_front();
 
 			// Get the width of the console (accounting for the newline character),
 			unsigned int console_width = get_console_width() - 1;
 
 			// Write the first line of the message to the string stream right aligned with the remainder of the row.
-			ss << std::setw(console_width - ss.str().length()) << line << std::endl;
+			ss << std::setw(console_width - ss.str().length()) << line + "\n";
 
 			// While there are remaining lines in the message,
 			while (!message_lines.empty()) {
 				// Get the line.
 				line = message_lines.front();
-				message_lines.pop();
+				message_lines.pop_front();
 
 				// Write the line to the output right aligned across the whole width of the console.
-				ss << std::setw(console_width) << line << std::endl;
+				ss << std::setw(console_width) << line + "\n";
 			}
 
 			// Print the fully formatted string.
@@ -146,8 +160,6 @@ namespace logging {
 
 	// Mutex to lock access to the console between threads, so output doesn't get garbled.
 	std::mutex console::mutex_print;
-	/// Initialise the maximum severity width to the maximum severity length from the enum class.
-	unsigned int console::max_severity_width = logging::Severity::get_max_severity_length();
 	/// Initialise the maximum name width to a long value.
 	unsigned int console::max_name_width = 40;
 }

@@ -13,11 +13,12 @@
 #include "LogBase.hpp"
 
 // System Libraries
+#include <chrono>
+#include <deque>
 #include <iostream>
 #include <iomanip>
 #include <string>
 #include <sstream>
-#include <queue>
 
 namespace logging {
 	namespace exception {
@@ -42,34 +43,47 @@ namespace logging {
 			std::string name,
 			severity severity = severity::error) 
 		{
+			// Generate the timestamp for the message.
+			std::string timestamp = generate_timestamp();
+
 			// Split the message into a queue of lines.
-			std::queue<std::string> message_lines = logging::split_string(message, "\n");
+			std::deque<std::string> message_lines = logging::split_string(message, "\n");
 
 			// Create a string stream to write the formatted output string to.
 			std::stringstream ss;
 
 			// Print the first line of the output in the format:
-			// [SEVERITY] (NAME) 					MESSAGE LINE 1
-			ss << std::left << "[" << std::string(Severity(severity)) + "] (" << std::string(name) + ") " << std::string(12, ' ') << std::right;
+			// [TIME] [SEVERITY] (NAME) 					MESSAGE LINE 1
+			ss 	<< std::left 
+				<< "[" << std::setw(time_template_width) << timestamp + "]" 
+				<< "[" << std::setw(Severity::get_max_severity_length() + 2) << std::string(Severity(severity)) + "]" 
+				<< "(" << std::string(name) + ") " 
+				<< std::right;
+
+			// Find the maximum width of each of the message lines
+			size_t max_message_width = 0;
+			for (std::string s : message_lines) {
+				max_message_width = std::max(max_message_width, s.length());
+			}
 
 			// Get the first line of the message (there is guaranteed to be 1).
 			std::string line = message_lines.front();
-			message_lines.pop();
+			message_lines.pop_front();
 
 			// Write the first line of the message to the string stream.
-			ss << line << std::endl;
+			ss << std::setw(max_message_width) << line + "\n";
 
-			// Get the width of the console (accounting for the newline character),
+			// Get the width of the first line (accounting for the newline character),
 			unsigned int first_line_width = (unsigned int)ss.str().length() - 1;
 
 			// While there are remaining lines in the message,
 			while (!message_lines.empty()) {
 				// Get the line.
 				line = message_lines.front();
-				message_lines.pop();
+				message_lines.pop_front();
 
-				// Write the line to the output right aligned across the whole width of the console.
-				ss << std::setw(first_line_width) << line << std::endl;
+				// Write the line to the output right aligned with the rest of the lines.
+				ss << std::setw(first_line_width) << line + "\n";
 			}
 
 			// Print the fully formatted string.
