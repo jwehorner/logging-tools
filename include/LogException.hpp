@@ -9,16 +9,15 @@
 #ifndef LOG_EXCEPTION_HPP
 #define LOG_EXCEPTION_HPP
 
-// Log Base Header
-#include "LogBase.hpp"
-
 // System Libraries
-#include <chrono>
 #include <deque>
 #include <iostream>
 #include <iomanip>
 #include <string>
 #include <sstream>
+
+// Log Base Header
+#include "LogBase.hpp"
 
 namespace logging {
 	namespace exception {

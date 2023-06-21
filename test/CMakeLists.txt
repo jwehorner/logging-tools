@@ -22,11 +22,10 @@ set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
 ##########################################
 # Catch Test Targets
 ##########################################
-add_executable(test_logging_tools			"${CMAKE_SOURCE_DIR}/test/test_logging_tools.cpp")
-
-include_directories(test_logging_tools		"${INCLUDES_LIST}")
-
-target_link_libraries(test_logging_tools 	Catch2::Catch2WithMain)
+add_executable(test_logging_tools				"${CMAKE_CURRENT_SOURCE_DIR}/test_logging_tools.cpp")
+target_compile_definitions(test_logging_tools	PUBLIC CATCH_CONFIG_NOSTDOUT)
+include_directories(test_logging_tools			"${INCLUDES_LIST}")
+target_link_libraries(test_logging_tools 		Catch2::Catch2WithMain)
 
 ##########################################
 # Regular Test Targets

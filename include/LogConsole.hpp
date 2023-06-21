@@ -9,20 +9,17 @@
 #ifndef LOG_CONSOLE_HPP
 #define LOG_CONSOLE_HPP
 
-// Log Base Header
-#include "LogBase.hpp"
-
 // System Libraries
 // Definition to prevent namespace clash of min/max on Windows
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include <algorithm>
-#include <chrono>
 #include <deque>
 #include <iostream>
 #include <iomanip>
 #include <mutex>
+#include <queue>
 #include <string>
 #include <sstream>
 
@@ -34,8 +31,10 @@
 #include <unistd.h>
 #endif
 
-namespace logging {
+// Log Base Header
+#include "LogBase.hpp"
 
+namespace logging {
 	/**
 	 * 	@anchor		console
 	 * 	@class 		console
@@ -51,6 +50,66 @@ namespace logging {
 	 */
 	class console {
 	public:
+		/*************************************************************************************************/
+		/* Non-Static Methods																			 */
+		/*************************************************************************************************/
+		/**
+		 * @brief 	Method get_instance retrieves the singleton instance of the console class.
+		 * @return 	console& singleton instance of the console class.
+		 */
+		static console& get_instance() {
+			static console instance;
+			return instance;
+		}
+
+		/// Deleted cloning constructor.
+		console(console &other) = delete;
+		/// Deleted assignment operator.
+		void operator=(const console &) = delete;
+
+		/**
+		 * 	@brief 		Method print_parallel sends the provided message to a child thread to
+		 * 				print as a formatted message to the console.
+		 * 	@details	The class tracks the messages that have been sent previously along 
+		 * 				with the current size of the console, to print messages into columns
+		 * 				along with splitting multi-line messages accordingly. The output 
+		 * 				follows the format:
+		 * 				| [SEVERITY] (NAME) 			MESSAGE LINE 1 |
+		 * 				|						 LONGER MESSAGE LINE 2 |
+		 * 				|					EVEN LONGER MESSAGE LINE 2 |
+		 * 				| [SEVERITY] (NAME) 			MESSAGE LINE 1 |
+		 * 	@param 		message 	string message to print to the console.
+		 * 	@param 		name 		string name of the component printing the message.
+		 * 	@param 		severity	logging::severity of the message.
+		 * 	@note		messages can contain newline characters ('\n') to print the message 
+		 * 				over separate lines.
+		 * 	@note		This method has significantly less overhead than the print method (by 
+		 * 				around 30x), and thus should be preferred for real-time use. The method 
+		 * 				works by adding the message to a queue where a child thread can service 
+		 * 				each print, thus blocking for a shorter period. An example usage is 
+		 * 				included below.
+		 * 	@code {.cpp}
+		 * 	logging::console::get_instance().print_parallel(
+		 * 		"Hello World!", 
+		 * 		"Example", 
+		 * 		logging::severity::info
+		 * 	)
+		 * 	@endcode
+		 * 
+		 */
+		void print_parallel(
+			const std::string message, 
+			const std::string name,
+			const severity severity = severity::error) 
+		{
+			std::unique_lock lock(print_queue_mutex);
+			print_queue.push(std::make_tuple(message, name, severity));
+			print_queue_condition_variable.notify_one();		
+		}
+
+		/*************************************************************************************************/
+		/* Static Methods																				 */
+		/*************************************************************************************************/
 		/**
 		 * 	@brief 		Static method print prints a formatted message to the console.
 		 * 	@details	The class tracks the messages that have been sent previously along 
@@ -68,12 +127,11 @@ namespace logging {
 		 * 				over separate lines.
 		 */
 		static void print(
-			std::string message, 
-			std::string name,
-			severity severity = severity::error) 
+			const std::string message, 
+			const std::string name,
+			const severity severity = severity::error) 
 		{
-			// Lock the widths mutex, then update the maximum name width.
-			std::scoped_lock<std::mutex> print_guard(mutex_print);
+			// Update the maximum name width.
 			max_name_width = std::max(max_name_width, (unsigned int)name.length());
 
 			// Generate the timestamp for the message.
@@ -119,6 +177,9 @@ namespace logging {
 				ss << std::setw(console_width) << line + "\n";
 			}
 
+			// Lock the standard output mutex.
+			std::scoped_lock<std::mutex> std_out_lock(std_out_mutex);
+
 			// Print the fully formatted string.
 			std::cout << ss.str();
 		}
@@ -133,14 +194,85 @@ namespace logging {
 		}
 
 	protected:
+		/*************************************************************************************************/
+		/* Static Members																				 */
+		/*************************************************************************************************/
 		/// Protected member to lock printing access between threads.
-		static std::mutex mutex_print;
-
+		static std::mutex std_out_mutex;
 		/// Maximum severity width in characters seen so far.
 		static unsigned int max_severity_width;
 		/// Maximum name width in characters seen so far.
 		static unsigned int max_name_width;	
 
+		/*************************************************************************************************/
+		/* Non-Static Members																			 */
+		/*************************************************************************************************/
+		/// Flag to interrupt the singleton child threads. 
+		std::atomic_bool interrupt_flag;
+		/// Queue of messages to be serviced by the printing child thread.
+		std::queue<std::tuple<std::string, std::string, logging::severity>> print_queue;
+		/// Printing child thread which will service the print queue.
+		std::thread print_thread;
+		/// Mutex to protect access to the print queue.
+		std::mutex print_queue_mutex;
+		/// Condition variable to indicate to the print thread when there are messages to print.
+		std::condition_variable print_queue_condition_variable;
+
+		/*************************************************************************************************/
+		/* Non-Static Methods																			 */
+		/*************************************************************************************************/
+		/**
+		 * @brief Protected constructor for the console class which launches the child threads.
+		 */
+		console() :
+			interrupt_flag(false),
+			print_queue{},
+			print_thread(&console::empty_print_queue, this)
+		{}
+
+		/**
+		 * @brief Destructor for the console class which interrupts the child threads.
+		 */
+		~console()
+		{
+			interrupt_flag.store(true);
+			if (print_thread.joinable()) {
+				print_thread.join();
+			}
+		}
+
+		/**
+		 *	@brief	Method empty_print_queue runs in it's own thread, where it waits on the print queue 
+		 *			condition variable for messages then prints them to the console.
+		 */
+		void empty_print_queue() {
+			// Create variables to store attributes of each message.
+			std::string message, name = "";
+			logging::severity severity = logging::severity::error;
+
+			// While the thread has not been interrupted,
+			while(!interrupt_flag.load()) {
+				// Wait for the print queue to have messages in it, or until 100ms have elapsed.
+				std::unique_lock lock(print_queue_mutex);
+				// If there is a message waiting to be printed,
+				if (print_queue_condition_variable.wait_for(lock, std::chrono::milliseconds(100), [this]{return !print_queue.empty();})) {
+					// Retrieve the elements of the message from the queue.
+					std::tie(message, name, severity) = print_queue.front();
+					print_queue.pop();
+					lock.unlock();
+					// Print the message to the console.
+					print(message, name, severity);
+				}
+				// If the wait time elapsed, just unlock the lock and continue.
+				else {
+					lock.unlock();
+				}
+			}
+		}
+
+		/*************************************************************************************************/
+		/* Static Methods																				 */
+		/*************************************************************************************************/
 		/**
 		 * @brief 	Method get_console_width gets the width of the console which will be printed to.
 		 * @return 	unsigned int width of the console in characters.
@@ -159,7 +291,7 @@ namespace logging {
 	};
 
 	// Mutex to lock access to the console between threads, so output doesn't get garbled.
-	std::mutex console::mutex_print;
+	std::mutex console::std_out_mutex;
 	/// Initialise the maximum name width to a long value.
 	unsigned int console::max_name_width = 40;
 }

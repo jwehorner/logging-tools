@@ -8,7 +8,8 @@
 #ifndef LOG_BASE_HPP
 #define LOG_BASE_HPP
 
-// System Libraries
+// C++ Standard Libraries
+#include <chrono>
 #include <cstdio>
 #include <deque>
 #include <string>
