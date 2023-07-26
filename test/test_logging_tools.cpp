@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <thread>
 
 // Unit Test Headers
 #include <catch2/benchmark/catch_benchmark_all.hpp>

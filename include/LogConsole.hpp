@@ -15,6 +15,8 @@
 #define NOMINMAX
 #endif
 #include <algorithm>
+#include <atomic>
+#include <condition_variable>
 #include <deque>
 #include <iostream>
 #include <iomanip>

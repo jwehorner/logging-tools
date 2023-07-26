@@ -38,7 +38,7 @@ namespace logging {
 	{
 	public:
 		Severity() = delete;
-		constexpr Severity(severity severity) : severity(severity) {}
+		constexpr Severity(severity severity) : m_severity(severity) {}
 
 		friend std::ostream& operator<<(std::ostream& os, const Severity &s) {
 			os << std::string(s);
@@ -46,7 +46,7 @@ namespace logging {
 		}
 
 		operator std::string() const { 
-			switch(severity) {
+			switch(m_severity) {
 				case info:
 					return "INFO";
 				case warning:
@@ -65,7 +65,7 @@ namespace logging {
 		}
 
 	private:
-		const severity severity;
+		const severity m_severity;
 	};
 
 	/**
@@ -130,7 +130,7 @@ namespace logging {
 		char timestamp_buffer[time_template_width];
 		std::snprintf(timestamp_buffer, 
 				time_template_width,
-				"%04d-%02d-%02d %02d:%02d:%02d.%lld",
+				"%04d-%02d-%02d %02d:%02d:%02d.%ld",
 				now.tm_year + 1900,
 				now.tm_mon + 1,
 				now.tm_mday,
