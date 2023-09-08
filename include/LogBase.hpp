@@ -128,6 +128,21 @@ namespace logging {
 
 		// Format the time into a buffer.
 		char timestamp_buffer[time_template_width];
+
+#ifdef _WIN32
+		// If on Windows, treat the milliseconds as a long long.
+		std::snprintf(timestamp_buffer, 
+				time_template_width,
+				"%04d-%02d-%02d %02d:%02d:%02d.%lld",
+				now.tm_year + 1900,
+				now.tm_mon + 1,
+				now.tm_mday,
+				now.tm_hour,
+				now.tm_min,
+				now.tm_sec,
+				millis);
+#else
+		// Otherwise, treat the milliseconds as a long.
 		std::snprintf(timestamp_buffer, 
 				time_template_width,
 				"%04d-%02d-%02d %02d:%02d:%02d.%ld",
@@ -138,7 +153,7 @@ namespace logging {
 				now.tm_min,
 				now.tm_sec,
 				millis);
-
+#endif
 		// Convert the buffer to a string.
 		return std::string(timestamp_buffer);
 	}
