@@ -24,6 +24,7 @@
 #include <queue>
 #include <string>
 #include <sstream>
+#include <thread>
 
 // Platform Dependant System Libraries
 #ifdef _WIN32
