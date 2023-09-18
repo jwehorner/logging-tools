@@ -107,6 +107,7 @@ namespace logging {
 		{
 			std::unique_lock lock(print_queue_mutex);
 			print_queue.push(std::make_tuple(message, name, severity));
+			print_queue_empty.store(print_queue.empty());
 			print_queue_condition_variable.notify_one();		
 		}
 
@@ -195,6 +196,8 @@ namespace logging {
 		/*************************************************************************************************/
 		/* Static Members																				 */
 		/*************************************************************************************************/
+		/// Number of milliseconds to timeout after when waiting on condition variables.
+		const static inline std::chrono::milliseconds WAIT_TIMEOUT_MS = std::chrono::milliseconds(100);;
 		/// Protected member to lock printing access between threads.
 		static std::mutex std_out_mutex;
 		/// Maximum severity width in characters seen so far.
@@ -209,6 +212,8 @@ namespace logging {
 		std::atomic_bool interrupt_flag;
 		/// Queue of messages to be serviced by the printing child thread.
 		std::queue<std::tuple<std::string, std::string, logging::severity>> print_queue;
+		/// Flag for if the print queue is empty.
+		std::atomic_bool print_queue_empty;
 		/// Printing child thread which will service the print queue.
 		std::thread print_thread;
 		/// Mutex to protect access to the print queue.
@@ -225,6 +230,7 @@ namespace logging {
 		console() :
 			interrupt_flag(false),
 			print_queue{},
+			print_queue_empty(false),
 			print_thread(&console::empty_print_queue, this)
 		{}
 
@@ -250,20 +256,27 @@ namespace logging {
 
 			// While the thread has not been interrupted,
 			while(!interrupt_flag.load()) {
-				// Wait for the print queue to have messages in it, or until 100ms have elapsed.
-				std::unique_lock lock(print_queue_mutex);
-				// If there is a message waiting to be printed,
-				if (print_queue_condition_variable.wait_for(lock, std::chrono::milliseconds(100), [this]{return !print_queue.empty();})) {
-					// Retrieve the elements of the message from the queue.
-					std::tie(message, name, severity) = print_queue.front();
-					print_queue.pop();
-					lock.unlock();
+				// If the print queue is empty,
+				if (print_queue_empty.load()) {
+					// Wait on the print queue empty condition variable for a fixed duration,
+					std::unique_lock<std::mutex> print_queue_lock(print_queue_mutex);
+					while (print_queue_condition_variable.wait_for(print_queue_lock, WAIT_TIMEOUT_MS) == std::cv_status::timeout && !interrupt_flag.load()) {}
+					// If waiting was interrupted by the interrupt flag, exit.
+					if (interrupt_flag.load()) {return;}
+					print_queue_lock.unlock();
+				}
+				// Once the print queue is not empty,
+				else {
+					{
+						// Wait for the print queue to have messages in it, or until 100ms have elapsed.
+						std::scoped_lock<std::mutex> print_queue_lock(print_queue_mutex);
+						// Retrieve the elements of the message from the queue.
+						std::tie(message, name, severity) = print_queue.front();
+						print_queue.pop();
+						print_queue_empty.store(print_queue.empty());
+					}
 					// Print the message to the console.
 					print(message, name, severity);
-				}
-				// If the wait time elapsed, just unlock the lock and continue.
-				else {
-					lock.unlock();
 				}
 			}
 		}
