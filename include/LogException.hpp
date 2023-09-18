@@ -26,10 +26,10 @@ namespace logging {
 		 * 	@details	Formats the message with the sender and severity into columns
 		 * 				along with splitting multi-line messages accordingly. The output 
 		 * 				follows the format:
-		 * 				| [SEVERITY] (NAME) 			MESSAGE LINE 1 |
-		 * 				|						 LONGER MESSAGE LINE 2 |
-		 * 				|					EVEN LONGER MESSAGE LINE 2 |
-		 * 				| [SEVERITY] (NAME) 			MESSAGE LINE 1 |
+		 * 				| [SEVERITY] (NAME) MESSAGE LINE 1				|
+		 * 				|					LONGER MESSAGE LINE 2 		|
+		 * 				|					EVEN LONGER MESSAGE LINE 2	|
+		 * 				| [SEVERITY] (NAME) MESSAGE LINE 1				|
 		 * 	@param 		message 	string message to include in the string.
 		 * 	@param 		name 		string name of the component formatting the message.
 		 * 	@param 		severity	logging::severity of the message.
@@ -37,7 +37,7 @@ namespace logging {
 		 * 	@note		messages can contain newline characters ('\n') to include the message 
 		 * 				over separate lines.
 		 */
-		std::string format_message(
+		const static std::string format_message(
 			std::string message, 
 			std::string name,
 			severity severity = severity::error) 
@@ -52,28 +52,21 @@ namespace logging {
 			std::stringstream ss;
 
 			// Print the first line of the output in the format:
-			// [TIME] [SEVERITY] (NAME) 					MESSAGE LINE 1
+			// [TIME] [SEVERITY] (NAME) MESSAGE LINE 1
 			ss 	<< std::left 
 				<< "[" << std::setw(time_template_width) << timestamp + "]" 
 				<< "[" << std::setw(Severity::get_max_severity_length() + 2) << std::string(Severity(severity)) + "]" 
-				<< "(" << std::string(name) + ") " 
-				<< std::right;
-
-			// Find the maximum width of each of the message lines
-			size_t max_message_width = 0;
-			for (std::string s : message_lines) {
-				max_message_width = std::max(max_message_width, s.length());
-			}
-
+				<< "(" << std::string(name) + ") ";
+				
 			// Get the first line of the message (there is guaranteed to be 1).
 			std::string line = message_lines.front();
 			message_lines.pop_front();
 
-			// Write the first line of the message to the string stream.
-			ss << std::setw(max_message_width) << line + "\n";
+			// Get the width of the preamble printed before the first line.
+			size_t preamble_width = ss.str().length();
 
-			// Get the width of the first line (accounting for the newline character),
-			unsigned int first_line_width = (unsigned int)ss.str().length() - 1;
+			// Write the first line of the message to the string stream.
+			ss << line + "\n";
 
 			// While there are remaining lines in the message,
 			while (!message_lines.empty()) {
@@ -82,7 +75,7 @@ namespace logging {
 				message_lines.pop_front();
 
 				// Write the line to the output right aligned with the rest of the lines.
-				ss << std::setw(first_line_width) << line + "\n";
+				ss << std::setw(preamble_width) << " " << line + "\n";
 			}
 
 			// Print the fully formatted string.

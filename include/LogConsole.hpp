@@ -46,10 +46,10 @@ namespace logging {
 	 * 				with the current size of the console, to print messages into columns
 	 * 				along with splitting multi-line messages accordingly. The output 
 	 * 				follows the format:
-	 * 				| [SEVERITY] (NAME) 			MESSAGE LINE 1 |
-	 * 				|						 LONGER MESSAGE LINE 2 |
-	 * 				|					EVEN LONGER MESSAGE LINE 2 |
-	 * 				| [SEVERITY] (NAME) 			MESSAGE LINE 1 |
+	 * 				| [SEVERITY] (NAME) MESSAGE LINE 1				|
+	 * 				|					LONGER MESSAGE LINE 2 		|
+	 * 				|					EVEN LONGER MESSAGE LINE 2	|
+	 * 				| [SEVERITY] (NAME) MESSAGE LINE 1				|
 	 */
 	class console {
 	public:
@@ -77,10 +77,10 @@ namespace logging {
 		 * 				with the current size of the console, to print messages into columns
 		 * 				along with splitting multi-line messages accordingly. The output 
 		 * 				follows the format:
-		 * 				| [SEVERITY] (NAME) 			MESSAGE LINE 1 |
-		 * 				|						 LONGER MESSAGE LINE 2 |
-		 * 				|					EVEN LONGER MESSAGE LINE 2 |
-		 * 				| [SEVERITY] (NAME) 			MESSAGE LINE 1 |
+		 * 				| [SEVERITY] (NAME) MESSAGE LINE 1				|
+		 * 				|					LONGER MESSAGE LINE 2 		|
+		 * 				|					EVEN LONGER MESSAGE LINE 2	|
+		 * 				| [SEVERITY] (NAME) MESSAGE LINE 1				|
 		 * 	@param 		message 	string message to print to the console.
 		 * 	@param 		name 		string name of the component printing the message.
 		 * 	@param 		severity	logging::severity of the message.
@@ -119,17 +119,17 @@ namespace logging {
 		 * 				with the current size of the console, to print messages into columns
 		 * 				along with splitting multi-line messages accordingly. The output 
 		 * 				follows the format:
-		 * 				| [SEVERITY] (NAME) 			MESSAGE LINE 1 |
-		 * 				|						 LONGER MESSAGE LINE 2 |
-		 * 				|					EVEN LONGER MESSAGE LINE 2 |
-		 * 				| [SEVERITY] (NAME) 			MESSAGE LINE 1 |
+		 * 				| [SEVERITY] (NAME) MESSAGE LINE 1				|
+		 * 				|					LONGER MESSAGE LINE 2 		|
+		 * 				|					EVEN LONGER MESSAGE LINE 2	|
+		 * 				| [SEVERITY] (NAME) MESSAGE LINE 1				|
 		 * 	@param 		message 	string message to print to the console.
 		 * 	@param 		name 		string name of the component printing the message.
 		 * 	@param 		severity	logging::severity of the message.
 		 * 	@note		messages can contain newline characters ('\n') to print the message 
 		 * 				over separate lines.
 		 */
-		static void print(
+		const static void print(
 			const std::string message, 
 			const std::string name,
 			const severity severity = severity::error) 
@@ -147,28 +147,21 @@ namespace logging {
 			std::stringstream ss;
 
 			// Print the first line of the output in the format:
-			// [TIME] [SEVERITY] (NAME) 					MESSAGE LINE 1
+			// [TIME] [SEVERITY] (NAME) MESSAGE LINE 1
 			ss 	<< std::left 
 				<< "[" << std::setw(time_template_width) << timestamp + "]" 
 				<< "[" << std::setw(Severity::get_max_severity_length() + 2) << std::string(Severity(severity)) + "]" 
-				<< "(" << std::setw(max_name_width + 2) << std::string(name) + ")" 
-				<< std::right;
-
-			// Find the maximum width of each of the message lines
-			size_t max_message_width = 0;
-			for (std::string s : message_lines) {
-				max_message_width = std::max(max_message_width, s.length());
-			}
+				<< "(" << std::setw(max_name_width + 2) << std::string(name) + ")";
 
 			// Get the first line of the message (there is guaranteed to be 1).
 			std::string line = message_lines.front();
 			message_lines.pop_front();
 
-			// Get the width of the console (accounting for the newline character),
-			unsigned int console_width = get_console_width() - 1;
+			// Get the width of the preamble printed before the first line.
+			size_t preamble_width = ss.str().length();
 
-			// Write the first line of the message to the string stream right aligned with the remainder of the row.
-			ss << std::setw(console_width - ss.str().length()) << line + "\n";
+			// Write the first line of the message to the string stream.
+			ss << line + "\n";
 
 			// While there are remaining lines in the message,
 			while (!message_lines.empty()) {
@@ -176,15 +169,17 @@ namespace logging {
 				line = message_lines.front();
 				message_lines.pop_front();
 
-				// Write the line to the output right aligned across the whole width of the console.
-				ss << std::setw(console_width) << line + "\n";
+				// Write the line to the output in line with the message lines above it.
+				ss << std::setw(preamble_width) << " " << line + "\n";
 			}
 
-			// Lock the standard output mutex.
-			std::scoped_lock<std::mutex> std_out_lock(std_out_mutex);
+			{
+				// Lock the standard output mutex.
+				std::scoped_lock<std::mutex> std_out_lock(std_out_mutex);
 
-			// Print the fully formatted string.
-			std::cout << ss.str();
+				// Print the fully formatted string.
+				std::cout << ss.str();
+			}
 		}
 
 		/**

@@ -66,13 +66,13 @@ int main( int argc, char* argv[] ) {
 /*************************************************************************************************/
 /* Severity Tests																				 */
 /*************************************************************************************************/
-TEST_CASE("Check to string operator.", "[Severity]") {
+TEST_CASE("Check to string operator.", "[test][Severity]") {
 	REQUIRE(std::string(logging::Severity(logging::severity::info)) == "INFO");
 	REQUIRE(std::string(logging::Severity(logging::severity::warning)) == "WARNING");
 	REQUIRE(std::string(logging::Severity(logging::severity::error)) == "ERROR");
 }
 
-TEST_CASE("Check << operator.", "[Severity]") {
+TEST_CASE("Check << operator.", "[test][Severity]") {
 	std::ostringstream ss;
 	REQUIRE_NOTHROW(ss << logging::Severity(logging::severity::info));
 	REQUIRE(ss.str() == "INFO");
@@ -85,7 +85,7 @@ TEST_CASE("Check << operator.", "[Severity]") {
 	ss = std::ostringstream("");
 }
 
-TEST_CASE("Check get_max_severity_length.", "[Severity]") {
+TEST_CASE("Check get_max_severity_length.", "[test][Severity]") {
 	REQUIRE(std::string(logging::Severity(logging::severity::info)).length() <= logging::Severity::get_max_severity_length());
 	REQUIRE(std::string(logging::Severity(logging::severity::warning)).length() <= logging::Severity::get_max_severity_length());
 	REQUIRE(std::string(logging::Severity(logging::severity::error)).length() <= logging::Severity::get_max_severity_length());
@@ -96,73 +96,92 @@ TEST_CASE("Check get_max_severity_length.", "[Severity]") {
 /*************************************************************************************************/
 /* LogConsole Tests																				 */
 /*************************************************************************************************/
-TEST_CASE("Print example console output.", "[LogConsole]") {
+TEST_CASE("Print example console output.", "[test][LogConsole][print][example]") {
 	REQUIRE_NOTHROW(
 		logging::console::print(
-			"Test1",
-			"LogConsole Unit Test",
-			logging::severity::info
-		)
-	);
-	REQUIRE_NOTHROW(
-		logging::console::print(
-			"Test2\nTest2",
-			"LogConsole Unit Test",
+			"This is a demo of the logging console functionality.",
+			"LogConsole Print Example",
 			logging::severity::info
 		)
 	);
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	REQUIRE_NOTHROW(
 		logging::console::print(
-			"Test3\nTest3Test3Test3Test3Test3",
-			"LogConsole Unit Test",
-			logging::severity::info
+			"You can write multi-line error messages\nThat should be split across multiple lines.",
+			"LogConsole Print Example Error",
+			logging::severity::error
+		)
+	);
+
+	REQUIRE_NOTHROW(
+		logging::console::print(
+			"And spills into where the messages should be.",
+			"LogConsole Print Example but what if the name gets too long",
+			logging::severity::warning
+		)
+	);
+
+	REQUIRE_NOTHROW(
+		logging::console::print(
+			"This happens and just pushes all subsequent messages to the right so they stay in columns.",
+			"LogConsole Print Example",
+			logging::severity::warning
 		)
 	);
 }
 
-TEST_CASE("Benchmark print console output.", "[LogConsole]") {
+TEST_CASE("Benchmark print console output.", "[benchmark][LogConsole][print]") {
 	BENCHMARK("Benchmark simple print.") {
 		return logging::console::print(
 			"BenchmarkPrint1",
-			"LogConsole Unit Test",
+			"LogConsole Print Benchmark",
 			logging::severity::info
 		);
 	};
 }
 
-TEST_CASE("Print parallel example console output.", "[LogConsole]") {
+TEST_CASE("Print parallel example console output.", "[test][LogConsole][print_parallel][example]") {
 	REQUIRE_NOTHROW(
 		logging::console::get_instance().print_parallel(
-			"TestParallel1",
-			"LogConsole Unit Test",
-			logging::severity::info
-		)
-	);
-	REQUIRE_NOTHROW(
-		logging::console::get_instance().print_parallel(
-			"TestParallel2\nTest2",
-			"LogConsole Unit Test",
+			"This is a demo of the logging console functionality.",
+			"LogConsole Print Parallel Example",
 			logging::severity::info
 		)
 	);
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	REQUIRE_NOTHROW(
 		logging::console::get_instance().print_parallel(
-			"TestParallel3\nTest3Test3Test3Test3Test3",
-			"LogConsole Unit Test",
-			logging::severity::info
+			"You can write multi-line error messages\nThat should be split across multiple lines.",
+			"LogConsole Print Parallel Error",
+			logging::severity::error
 		)
 	);
+
+	REQUIRE_NOTHROW(
+		logging::console::get_instance().print_parallel(
+			"And spills into where the messages should be.",
+			"LogConsole Print Parallel but what if the name gets too long",
+			logging::severity::warning
+		)
+	);
+
+	REQUIRE_NOTHROW(
+		logging::console::get_instance().print_parallel(
+			"This happens and just pushes all subsequent messages to the right so they stay in columns.",
+			"LogConsole Print Parallel Example",
+			logging::severity::warning
+		)
+	);
+
+	// Give the thread a chance to print before exiting.
+	std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 
-TEST_CASE("Benchmark print_parallel console output.", "[LogConsole]") {
+TEST_CASE("Benchmark print_parallel console output.", "[benchmark][LogConsole][print_parallel]") {
 	BENCHMARK("Benchmark simple print_parallel.") {
 		return logging::console::get_instance().print_parallel(
 			"BenchmarkPrintParallel1",
-			"LogConsole Unit Test",
+			"LogConsole Print Parallel Benchmark",
 			logging::severity::info
 		);
 	};
@@ -173,28 +192,36 @@ TEST_CASE("Benchmark print_parallel console output.", "[LogConsole]") {
 /*************************************************************************************************/
 /* LogException Tests																			 */
 /*************************************************************************************************/
-TEST_CASE("Print example exceptions.", "[LogException]") {
+TEST_CASE("Print example exceptions.", "[test][LogException][format_message][example]") {
 	REQUIRE_NOTHROW(
 		std::cout << logging::exception::format_message(
-			"Test1",
-			"LogException Unit Test",
-			logging::severity::info
-		)
-	);
-	REQUIRE_NOTHROW(
-		std::cout << logging::exception::format_message(
-			"Test2\nTest2",
-			"LogException Unit Test",
+			"This is a demo of the logging console functionality.",
+			"LogException Example",
 			logging::severity::info
 		)
 	);
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	REQUIRE_NOTHROW(
 		std::cout << logging::exception::format_message(
-			"Test3\nTest3Test3Test3Test3Test3",
-			"LogException Unit Test",
-			logging::severity::info
+			"You can write multi-line error messages\nThat should be split across multiple lines.",
+			"LogException Example Error",
+			logging::severity::error
+		)
+	);
+
+	REQUIRE_NOTHROW(
+		std::cout << logging::exception::format_message(
+			"And spills into where the messages should be.",
+			"LogException Example but what if the name gets too long",
+			logging::severity::warning
+		)
+	);
+
+	REQUIRE_NOTHROW(
+		std::cout << logging::exception::format_message(
+			"The rows do not line up as the function has no state like the console methods do,\n so no formatting into columns is performed.",
+			"LogException Example",
+			logging::severity::warning
 		)
 	);
 }
